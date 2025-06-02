@@ -8,7 +8,7 @@ especially total phosphorus (TP). Data sources include publicly available databa
 Aquatic Resource Surveys, Stream Diatom Dataset) and contributed unpublished datasets.
 
 # Discription
-File: Fig. x.RMD 
+File: Fig. x.RMD  
 Description: All R scripts used for data processing, analysis, and visualization in the study.
 
 File: processed_data.zip
