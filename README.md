@@ -11,7 +11,7 @@ Aquatic Resource Surveys, Stream Diatom Dataset) and contributed unpublished dat
 File: Fig. x.RMD  
 Description: All R scripts used for data processing, analysis, and visualization in the study.
 
-File: processed_data.zip
+File: processed_data.zip  
 Description: R-processed process files.
 
 # Raw data
