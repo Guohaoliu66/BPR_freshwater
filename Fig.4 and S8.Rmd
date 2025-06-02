@@ -1,0 +1,476 @@
+
+# Bar plot Richness
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(patchwork)
+library(ggpattern)
+
+#data=read.csv("bar_plot.csv")
+
+rich_data <- data %>%
+  filter(BPR.type == "Richness") %>%
+  select(Organism, 
+         "Positive", "Unimodal", "Negative", 
+         "None", "U_shape", Number) %>%
+  mutate(across(where(is.character), ~ gsub("%", "", .))) %>%
+  mutate(across(c("Positive", "Unimodal", "Negative", 
+                  "None", "U_shape"), as.numeric)) %>%
+  pivot_longer(cols = c("Positive", "Unimodal", "Negative", 
+                        "None", "U_shape"),
+               names_to = "BPR_Type", values_to = "Percentage")
+
+rich_data$BPR_Type <- factor(rich_data$BPR_Type, 
+                             levels = c("Unimodal", "Positive", "Negative", "U_shape", "None"))
+
+
+bpr_colors <- c(
+  "Unimodal" = "#db6968",
+  "Positive" = "#0074b3",
+  "Negative" = "skyblue",
+  "U_shape"  = "#f8984e",
+  "None"     = "gray"
+)
+
+make_group_plot <- function(df, group_label, n_label, custom_fill = FALSE) {
+  p <- ggplot(df, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+    geom_bar(stat = "identity", width = 0.6) +
+    annotate("text", x = 1.85, y = 58, 
+             label = n_label, hjust = 1, size = 4.5) +
+    scale_y_continuous(labels = percent_format(scale = 1),
+                       limits = c(0, 60),
+                       expand = c(0, 0)) +
+    labs(title = group_label, x = NULL, y = NULL) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid = element_blank(),
+      axis.line.x = element_line(color = "black", linewidth = 0.6),
+      axis.line.y = element_line(color = "black", linewidth = 0.6),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+  if (custom_fill) {
+    p <- p + scale_fill_manual(values = bpr_colors)
+  }
+
+  return(p)
+}
+
+
+p1_data <- filter(rich_data, Organism == "Total")
+p1 <- make_group_plot(p1_data, "Total", paste0("n = ", unique(p1_data$Number)), custom_fill = TRUE)
+
+n_labels_p2 <- rich_data %>%
+  filter(Organism %in% c("Lake", "River")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",
+         y = 58)  
+
+p2_data <- filter(rich_data, Organism %in% c("Lake", "River"))
+p2 <- ggplot(p2_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p2, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Lake            River", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+n_labels_p3 <- rich_data %>%
+  filter(Organism %in% c("Producer", "Consumer")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",
+         y = 58)
+
+
+p3_data <- filter(rich_data, Organism %in% c("Producer", "Consumer"))
+p3 <- ggplot(p3_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p3, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Producer   Consumer", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+(p1 | p3 | p2) + plot_layout(ncol = 3)
+
+
+#ggsave("richness.pdf",  device = "pdf", width = 9, height = 3.5)
+```
+
+# Bar plot FRic
+```{r}
+
+rich_data <- data %>%
+  filter(BPR.type == "FRic") %>%
+  select(Organism, 
+         "Positive", "Unimodal", "Negative", 
+         "None", "U_shape", Number) %>%
+  mutate(across(where(is.character), ~ gsub("%", "", .))) %>%
+  mutate(across(c("Positive", "Unimodal", "Negative", 
+                  "None", "U_shape"), as.numeric)) %>%
+  pivot_longer(cols = c("Positive", "Unimodal", "Negative", 
+                        "None", "U_shape"),
+               names_to = "BPR_Type", values_to = "Percentage")
+
+rich_data$BPR_Type <- factor(rich_data$BPR_Type, 
+                             levels = c("Unimodal", "Positive", "Negative", "U_shape", "None"))
+
+
+bpr_colors <- c(
+  "Unimodal" = "#db6968",
+  "Positive" = "#0074b3",
+  "Negative" = "skyblue",
+  "U_shape"  = "#f8984e",
+  "None"     = "gray"
+)
+
+make_group_plot <- function(df, group_label, n_label, custom_fill = FALSE) {
+  p <- ggplot(df, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+    geom_bar(stat = "identity", width = 0.6) +
+    annotate("text", x = 1.85, y = 58, 
+             label = n_label, hjust = 1, size = 4.5) +
+    scale_y_continuous(labels = percent_format(scale = 1),
+                       limits = c(0, 60),
+                       expand = c(0, 0)) +
+    labs(title = group_label, x = NULL, y = NULL) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid = element_blank(),
+      axis.line.x = element_line(color = "black", linewidth = 0.6),
+      axis.line.y = element_line(color = "black", linewidth = 0.6),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+  if (custom_fill) {
+    p <- p + scale_fill_manual(values = bpr_colors)
+  }
+
+  return(p)
+}
+
+
+p1_data <- filter(rich_data, Organism == "Total")
+p1 <- make_group_plot(p1_data, "Total", paste0("n = ", unique(p1_data$Number)), custom_fill = TRUE)
+
+n_labels_p2 <- rich_data %>%
+  filter(Organism %in% c("Lake", "River")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal", 
+         y = 58)  
+
+p2_data <- filter(rich_data, Organism %in% c("Lake", "River"))
+p2 <- ggplot(p2_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p2, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Lake            River", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+n_labels_p3 <- rich_data %>%
+  filter(Organism %in% c("Producer", "Consumer")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",
+         y = 58)
+
+
+p3_data <- filter(rich_data, Organism %in% c("Producer", "Consumer"))
+p3 <- ggplot(p3_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p3, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Producer   Consumer", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+(p1 | p3 | p2) + plot_layout(ncol = 3)
+
+
+ggsave("FRic.pdf",  device = "pdf", width = 9, height = 3.5)
+```
+
+
+# Bar plot Shannon
+```{r}
+
+
+rich_data <- data %>%
+  filter(BPR.type == "Shannon") %>%
+  select(Organism, 
+         "Positive", "Unimodal", "Negative", 
+         "None", "U_shape", Number) %>%
+  mutate(across(where(is.character), ~ gsub("%", "", .))) %>%
+  mutate(across(c("Positive", "Unimodal", "Negative", 
+                  "None", "U_shape"), as.numeric)) %>%
+  pivot_longer(cols = c("Positive", "Unimodal", "Negative", 
+                        "None", "U_shape"),
+               names_to = "BPR_Type", values_to = "Percentage")
+
+rich_data$BPR_Type <- factor(rich_data$BPR_Type, 
+                             levels = c("Unimodal", "Positive", "Negative", "U_shape", "None"))
+
+
+bpr_colors <- c(
+  "Unimodal" = "#db6968",
+  "Positive" = "#0074b3",
+  "Negative" = "skyblue",
+  "U_shape"  = "#f8984e",
+  "None"     = "gray"
+)
+
+make_group_plot <- function(df, group_label, n_label, custom_fill = FALSE) {
+  p <- ggplot(df, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+    geom_bar(stat = "identity", width = 0.6) +
+    annotate("text", x = 1.85, y = 58, 
+             label = n_label, hjust = 1, size = 4.5) +
+    scale_y_continuous(labels = percent_format(scale = 1),
+                       limits = c(0, 60),
+                       expand = c(0, 0)) +
+    labs(title = group_label, x = NULL, y = NULL) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid = element_blank(),
+      axis.line.x = element_line(color = "black", linewidth = 0.6),
+      axis.line.y = element_line(color = "black", linewidth = 0.6),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+  if (custom_fill) {
+    p <- p + scale_fill_manual(values = bpr_colors)
+  }
+
+  return(p)
+}
+
+
+p1_data <- filter(rich_data, Organism == "Total")
+p1 <- make_group_plot(p1_data, "Total", paste0("n = ", unique(p1_data$Number)), custom_fill = TRUE)
+
+n_labels_p2 <- rich_data %>%
+  filter(Organism %in% c("Lake", "River")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",
+         y = 58)  
+
+p2_data <- filter(rich_data, Organism %in% c("Lake", "River"))
+p2 <- ggplot(p2_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p2, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Lake            River", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+n_labels_p3 <- rich_data %>%
+  filter(Organism %in% c("Producer", "Consumer")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",
+         y = 58)
+
+
+p3_data <- filter(rich_data, Organism %in% c("Producer", "Consumer"))
+p3 <- ggplot(p3_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p3, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Producer   Consumer", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+(p1 | p3 | p2) + plot_layout(ncol = 3)
+
+
+ggsave("Shannon.pdf",  device = "pdf", width = 9, height = 3.5)
+```
+
+# Bar plot FDis
+```{r}
+
+
+rich_data <- data %>%
+  filter(BPR.type == "FDis") %>%
+  select(Organism, 
+         "Positive", "Unimodal", "Negative", 
+         "None", "U_shape", Number) %>%
+  mutate(across(where(is.character), ~ gsub("%", "", .))) %>%
+  mutate(across(c("Positive", "Unimodal", "Negative", 
+                  "None", "U_shape"), as.numeric)) %>%
+  pivot_longer(cols = c("Positive", "Unimodal", "Negative", 
+                        "None", "U_shape"),
+               names_to = "BPR_Type", values_to = "Percentage")
+
+rich_data$BPR_Type <- factor(rich_data$BPR_Type, 
+                             levels = c("Unimodal", "Positive", "Negative", "U_shape", "None"))
+
+
+bpr_colors <- c(
+  "Unimodal" = "#db6968",
+  "Positive" = "#0074b3",
+  "Negative" = "skyblue",
+  "U_shape"  = "#f8984e",
+  "None"     = "gray"
+)
+
+make_group_plot <- function(df, group_label, n_label, custom_fill = FALSE) {
+  p <- ggplot(df, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+    geom_bar(stat = "identity", width = 0.6) +
+    annotate("text", x = 1.85, y = 58, 
+             label = n_label, hjust = 1, size = 4.5) +
+    scale_y_continuous(labels = percent_format(scale = 1),
+                       limits = c(0, 60),
+                       expand = c(0, 0)) +
+    labs(title = group_label, x = NULL, y = NULL) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid = element_blank(),
+      axis.line.x = element_line(color = "black", linewidth = 0.6),
+      axis.line.y = element_line(color = "black", linewidth = 0.6),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+  if (custom_fill) {
+    p <- p + scale_fill_manual(values = bpr_colors)
+  }
+
+  return(p)
+}
+
+p1_data <- filter(rich_data, Organism == "Total")
+p1 <- make_group_plot(p1_data, "Total", paste0("n = ", unique(p1_data$Number)), custom_fill = TRUE)
+
+n_labels_p2 <- rich_data %>%
+  filter(Organism %in% c("Lake", "River")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",  
+         y = 58)  
+
+p2_data <- filter(rich_data, Organism %in% c("Lake", "River"))
+p2 <- ggplot(p2_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p2, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Lake            River", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+n_labels_p3 <- rich_data %>%
+  filter(Organism %in% c("Producer", "Consumer")) %>%
+  select(Organism, Number) %>%
+  distinct() %>%
+  mutate(label = paste0("n = ", Number),
+         x = "Unimodal",
+         y = 58)
+
+
+p3_data <- filter(rich_data, Organism %in% c("Producer", "Consumer"))
+p3 <- ggplot(p3_data, aes(x = BPR_Type, y = Percentage, fill = BPR_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~ Organism) +
+  geom_text(data = n_labels_p3, aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, hjust = 0, size = 4.5) +
+  scale_fill_manual(values = bpr_colors) +
+  scale_y_continuous(labels = percent_format(scale = 1), limits = c(0, 60), expand = c(0, 0)) +
+  labs(title = "Producer   Consumer", x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme( legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+(p1 | p3 | p2) + plot_layout(ncol = 3)
+
+
+ggsave("FDis.pdf",  device = "pdf", width = 9, height = 3.5)
+```
+

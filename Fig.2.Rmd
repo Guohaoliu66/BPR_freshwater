@@ -1,0 +1,119 @@
+
+# Description (Fig.1) 
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+
+logTP=log(data$TP)
+dataset_medians <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Data = first(Data),  
+    Organism = first(Organism), 
+    Median_Area = median(Area, na.rm = TRUE),
+    Median_TP = median(TP, na.rm = TRUE),
+    Median_Elevation = median(Elevation, na.rm = TRUE),
+    Median_AT = median(AT, na.rm = TRUE),
+    Median_AP = median(AP, na.rm = TRUE),
+    Median_TS = median(TS, na.rm = TRUE),
+    Median_PS = median(PS, na.rm = TRUE),
+    Median_n = median(Num, na.rm = TRUE),
+    Median_Absolute_Latitude = median(abs(Y), na.rm = TRUE)
+  )
+
+dataset_medians <- dataset_medians %>%
+  filter(!(Dataset %in% c("LETBM", "RNEBM", "RKEBD")))
+
+custom_theme <- theme_minimal() +
+  theme(
+    panel.border = element_blank(),         
+    axis.line.x = element_line(color = "black"),  
+    axis.line.y = element_line(color = "black"),  
+    panel.grid = element_blank(),     
+    axis.ticks = element_line(color = "black"),  
+    axis.text = element_text(color = "black")     
+  )
+
+
+p1 <- ggplot(dataset_medians, aes(x = Median_TP)) +
+  geom_histogram(bins = 12, fill = "#547ac0", color = "white") +
+  labs(x = "Total Phosphorus (µg/L) ", y = "Number of Datasets") +
+  custom_theme
+
+p2 <- ggplot(dataset_medians, aes(x = log(Median_Area))) +
+  geom_histogram(bins = 12, fill = "#547ac0", color = "white") +
+  labs(x = "Area (log [km²])", y = "Number of Datasets") +
+  custom_theme
+
+p3 <- ggplot(dataset_medians, aes(x = Median_Elevation)) +
+  geom_histogram(bins = 12, fill = "#547ac0", color = "white") +
+  labs(x = "Elevation (m)", y = "Number of Datasets") +
+  custom_theme
+
+p4 <- ggplot(dataset_medians, aes(x = Median_AT)) +
+  geom_histogram(bins = 12, fill = "#547ac0", color = "white") +
+  labs(x = "Median Annual Temperature (°C)", y = "Number of Datasets") +
+  custom_theme
+
+p5 <- ggplot(dataset_medians, aes(x = Median_AP)) +
+  geom_histogram(bins = 12, fill = "#547ac0", color = "white") +
+  labs(x = "Annual Precipitation (mm)", y = "Number of Datasets") +
+  custom_theme
+
+p6 <- ggplot(dataset_medians, aes(x = Median_Absolute_Latitude)) +
+  geom_histogram(bins = 12, fill = "#547ac0", color = "white") +
+  labs(x = "Absolute Latitude (°)", y = "Number of Datasets") +
+  custom_theme
+
+#output_path <- "Mean.pdf"
+#pdf(output_path, width = 7, height = 5)  
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3) 
+#dev.off()  
+
+organism_data_summary <- dataset_medians %>%
+  group_by(Organism, Data) %>%
+  summarise(Count = n(), .groups = "drop")
+
+organism_order <- organism_data_summary %>%
+  group_by(Organism) %>%
+  summarise(Total_Count = sum(Count)) %>%
+  arrange(desc(Total_Count)) %>%
+  pull(Organism)
+
+
+organism_data_summary$Organism <- gsub("Benthic Macroinvertebrate", "Benthic\nMacroinvertebrate", organism_data_summary$Organism)
+organism_data_summary$Organism <- gsub("Benthic Diatom", "Benthic\nDiatom", organism_data_summary$Organism)
+
+organism_order <- organism_data_summary %>%
+  group_by(Organism) %>%
+  summarise(Total_Count = sum(Count)) %>%
+  arrange(desc(Total_Count)) %>%
+  pull(Organism)
+
+organism_data_summary$Organism <- factor(organism_data_summary$Organism, levels = rev(organism_order))
+
+custom_colors <- c("Lake" = "#99cbeb", "River" = "#547ac0")
+
+ggplot(organism_data_summary, aes(x = Count, y = Organism, fill = Data)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = custom_colors) + 
+  labs(
+    title = "Number of Datasets by Organism",
+    x = "Number of Datasets",
+    fill = "Waterbody type"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",                            
+    legend.title = element_text(size = 10),          
+    panel.grid.major = element_blank(),                
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),                     
+    axis.line.x = element_line(color = "black"),        
+    axis.line.y = element_line(color = "black"),        
+    axis.ticks = element_line(color = "black"),         
+    axis.text = element_text(color = "black")         
+  )
+#ggsave("Organism.pdf", device = "pdf", width = 3, height = 4)
+```

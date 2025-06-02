@@ -1,0 +1,583 @@
+---
+  title: "Global BPR pattern"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Import data
+```{r}
+
+setwd("D:/...")
+library(readxl)
+library(dplyr)
+library(data.table)
+data=read.csv("All_data.csv")
+
+```
+
+# Shape define Richness
+```{r}
+
+process_dataset <- function(df) {
+  Remove <- FALSE
+  Reason <- "Processed"
+
+  skewness_logTP <- tryCatch({
+    skewness(df$logTP, na.rm = TRUE)
+  }, error = function(e) NA)
+
+  sd_logTP <- sd(df$logTP, na.rm = TRUE)
+
+  logTP_iqr <- IQR(df$logTP, na.rm = TRUE)
+  logTP_q1 <- quantile(df$logTP, 0.25, na.rm = TRUE)
+  logTP_q3 <- quantile(df$logTP, 0.75, na.rm = TRUE)
+  logTP_outliers <- sum(df$logTP < (logTP_q1 - 1.5 * logTP_iqr) | 
+                        df$logTP > (logTP_q3 + 1.5 * logTP_iqr), na.rm = TRUE)
+  outlier_ratio <- logTP_outliers / nrow(df)
+
+  distribution_info <- list(
+    Skewness = skewness_logTP,
+    Standard_Deviation = sd_logTP,
+    Outlier_Ratio = outlier_ratio
+  )
+
+  linear_model <- glm(Richness ~ logTP, data = df, family = gaussian())
+  quadratic_model <- glm(Richness ~ logTP + I(logTP^2), data = df, family = gaussian())
+
+  linear_aic <- AIC(linear_model)
+  quadratic_aic <- AIC(quadratic_model)
+  
+  if (abs(linear_aic - quadratic_aic) < 3) {
+    linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+    linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+    quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+    quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+
+    deviance_explained_linear <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+    deviance_explained_quadratic <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+    if (linear_p < 0.1) {
+      if (linear_coef > 0) {
+        relationship_type <- "Positive Linear"
+      } else {
+        relationship_type <- "Negative Linear"
+      }
+      deviance_explained <- deviance_explained_linear
+    } else if (quad_p < 0.1) {
+      if (quad_coef < 0) {
+        relationship_type <- "Unimodal"
+      } else {
+        relationship_type <- "Inverted Unimodal"
+      }
+      deviance_explained <- deviance_explained_quadratic
+    } else {
+      relationship_type <- "Non-significant"
+      deviance_explained <- max(deviance_explained_linear, deviance_explained_quadratic)
+    }
+  } else {
+
+    if (quadratic_aic < linear_aic) {
+      quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+      quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+      deviance_explained <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+      if (quad_p < 0.1) {
+        if (quad_coef < 0) {
+          relationship_type <- "Unimodal"
+        } else {
+          relationship_type <- "Inverted Unimodal"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    } else {
+      linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+      linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+      deviance_explained <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+
+      if (linear_p < 0.1) {
+        if (linear_coef > 0) {
+          relationship_type <- "Positive Linear"
+        } else {
+          relationship_type <- "Negative Linear"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    }
+  }
+
+  return(list(
+    Remove = Remove,
+    Reason = Reason,
+    Distribution_Info = distribution_info,
+    Relationship_Type = relationship_type,
+    Deviance_Explained = deviance_explained
+  ))
+}
+
+data_results <- lapply(split(data, data$Dataset), process_dataset)
+
+results_df <- data.frame(
+  Dataset = names(data_results),
+  Remove = sapply(data_results, function(x) x$Remove),
+  Reason = sapply(data_results, function(x) x$Reason),
+  Skewness = sapply(data_results, function(x) x$Distribution_Info$Skewness),
+  Standard_Deviation = sapply(data_results, function(x) x$Distribution_Info$Standard_Deviation),
+  Outlier_Ratio = sapply(data_results, function(x) x$Distribution_Info$Outlier_Ratio),
+  Relationship_Type = sapply(data_results, function(x) x$Relationship_Type),
+  Deviance_Explained = sapply(data_results, function(x) x$Deviance_Explained)
+)
+
+result <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Organism = first(Organism),
+    Data = first(Data),
+    Num = mean(Num, na.rm = TRUE),
+    Area = mean(Area, na.rm = TRUE),
+    Median_TP = median(TP, na.rm = TRUE),
+    Median_AT = median(AT, na.rm = TRUE),
+    Median_AP = median(AP, na.rm = TRUE),
+    Median_Elevation = median(Elevation, na.rm = TRUE),
+    Median_AL = median(AL, na.rm = TRUE),
+    TP_Range = max(TP, na.rm = TRUE) - min(TP, na.rm = TRUE),
+    AT_Range = max(AT, na.rm = TRUE) - min(AT, na.rm = TRUE),
+    AP_Range = max(AP, na.rm = TRUE) - min(AP, na.rm = TRUE),
+    Elevation_Range = max(Elevation, na.rm = TRUE) - min(Elevation, na.rm = TRUE),
+    AL_Range = max(AL, na.rm = TRUE) - min(AL, na.rm = TRUE),
+  ) %>%
+  left_join(results_df, by = "Dataset") %>%
+  distinct()
+
+
+data <- data %>%left_join(result, by = "Dataset")
+
+
+#write.csv(result, file = "result.csv")
+#write.csv(data, file = "All_data.csv")
+```
+
+# Shape define Shannon
+```{r}
+
+process_dataset <- function(df) {
+  Remove <- FALSE
+  Reason <- "Processed"
+
+  skewness_logTP <- tryCatch({
+    skewness(df$logTP, na.rm = TRUE)
+  }, error = function(e) NA)
+
+  sd_logTP <- sd(df$logTP, na.rm = TRUE)
+
+  logTP_iqr <- IQR(df$logTP, na.rm = TRUE)
+  logTP_q1 <- quantile(df$logTP, 0.25, na.rm = TRUE)
+  logTP_q3 <- quantile(df$logTP, 0.75, na.rm = TRUE)
+  logTP_outliers <- sum(df$logTP < (logTP_q1 - 1.5 * logTP_iqr) | 
+                        df$logTP > (logTP_q3 + 1.5 * logTP_iqr), na.rm = TRUE)
+  outlier_ratio <- logTP_outliers / nrow(df)
+
+  distribution_info <- list(
+    Skewness = skewness_logTP,
+    Standard_Deviation = sd_logTP,
+    Outlier_Ratio = outlier_ratio
+  )
+
+  linear_model <- glm(Shannon ~ logTP, data = df, family = gaussian())
+  quadratic_model <- glm(Shannon ~ logTP + I(logTP^2), data = df, family = gaussian())
+
+  linear_aic <- AIC(linear_model)
+  quadratic_aic <- AIC(quadratic_model)
+
+  if (abs(linear_aic - quadratic_aic) < 3) {
+    linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+    linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+    quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+    quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+
+    deviance_explained_linear <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+    deviance_explained_quadratic <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+    if (linear_p < 0.1) {
+      if (linear_coef > 0) {
+        relationship_type <- "Positive Linear"
+      } else {
+        relationship_type <- "Negative Linear"
+      }
+      deviance_explained <- deviance_explained_linear
+    } else if (quad_p < 0.1) {
+      if (quad_coef < 0) {
+        relationship_type <- "Unimodal"
+      } else {
+        relationship_type <- "Inverted Unimodal"
+      }
+      deviance_explained <- deviance_explained_quadratic
+    } else {
+      relationship_type <- "Non-significant"
+      deviance_explained <- max(deviance_explained_linear, deviance_explained_quadratic)
+    }
+  } else {
+
+    if (quadratic_aic < linear_aic) {
+      quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+      quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+      deviance_explained <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+      if (quad_p < 0.1) {
+        if (quad_coef < 0) {
+          relationship_type <- "Unimodal"
+        } else {
+          relationship_type <- "Inverted Unimodal"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    } else {
+      linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+      linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+      deviance_explained <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+
+      if (linear_p < 0.1) {
+        if (linear_coef > 0) {
+          relationship_type <- "Positive Linear"
+        } else {
+          relationship_type <- "Negative Linear"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    }
+  }
+
+  return(list(
+    Remove = Remove,
+    Reason = Reason,
+    Distribution_Info = distribution_info,
+    Relationship_Type = relationship_type,
+    Deviance_Explained = deviance_explained
+  ))
+}
+
+data_results <- lapply(split(data, data$Dataset), process_dataset)
+
+results_df <- data.frame(
+  Dataset = names(data_results),
+  Relationship_Type_Shannon = sapply(data_results, function(x) x$Relationship_Type),
+  Deviance_Explained_Shannon = sapply(data_results, function(x) x$Deviance_Explained)
+)
+
+result <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Organism = first(Organism),
+    Data = first(Data),
+    Num = mean(Num, na.rm = TRUE),
+    Area = mean(Area, na.rm = TRUE),
+    Median_TP = median(TP, na.rm = TRUE),
+    Median_AT = median(AT, na.rm = TRUE),
+    Median_AP = median(AP, na.rm = TRUE),
+    Median_Elevation = median(Elevation, na.rm = TRUE),
+    Median_AL = median(AL, na.rm = TRUE),
+    TP_Range = max(TP, na.rm = TRUE) - min(TP, na.rm = TRUE),
+    AT_Range = max(AT, na.rm = TRUE) - min(AT, na.rm = TRUE),
+    AP_Range = max(AP, na.rm = TRUE) - min(AP, na.rm = TRUE),
+    Elevation_Range = max(Elevation, na.rm = TRUE) - min(Elevation, na.rm = TRUE),
+    AL_Range = max(AL, na.rm = TRUE) - min(AL, na.rm = TRUE),
+  ) %>%
+  left_join(results_df, by = "Dataset") %>%
+  distinct()
+
+）
+data <- data %>%left_join(result, by = "Dataset")
+
+#write.csv(result, file = "result_Shannon.csv")
+#write.csv(data, file = "All_data_Shannon.csv")
+
+
+```
+
+# Shape define FRic
+```{r}
+data=data[!is.na(data$FRic) & !is.na(data$logTP), ]
+
+
+process_dataset <- function(df) {
+  Remove <- FALSE
+  Reason <- "Processed"
+
+  skewness_logTP <- tryCatch({
+    skewness(df$logTP, na.rm = TRUE)
+  }, error = function(e) NA)
+
+  sd_logTP <- sd(df$logTP, na.rm = TRUE)
+
+  logTP_iqr <- IQR(df$logTP, na.rm = TRUE)
+  logTP_q1 <- quantile(df$logTP, 0.25, na.rm = TRUE)
+  logTP_q3 <- quantile(df$logTP, 0.75, na.rm = TRUE)
+  logTP_outliers <- sum(df$logTP < (logTP_q1 - 1.5 * logTP_iqr) | 
+                        df$logTP > (logTP_q3 + 1.5 * logTP_iqr), na.rm = TRUE)
+  outlier_ratio <- logTP_outliers / nrow(df)
+
+  distribution_info <- list(
+    Skewness = skewness_logTP,
+    Standard_Deviation = sd_logTP,
+    Outlier_Ratio = outlier_ratio
+  )
+
+  linear_model <- glm(FRic ~ logTP, data = df, family = gaussian())
+  quadratic_model <- glm(FRic ~ logTP + I(logTP^2), data = df, family = gaussian())
+
+  linear_aic <- AIC(linear_model)
+  quadratic_aic <- AIC(quadratic_model)
+  
+  if (abs(linear_aic - quadratic_aic) < 3) {
+    linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+    linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+    quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+    quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+
+    deviance_explained_linear <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+    deviance_explained_quadratic <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+    if (linear_p < 0.1) {
+      if (linear_coef > 0) {
+        relationship_type <- "Positive Linear"
+      } else {
+        relationship_type <- "Negative Linear"
+      }
+      deviance_explained <- deviance_explained_linear
+    } else if (quad_p < 0.1) {
+      if (quad_coef < 0) {
+        relationship_type <- "Unimodal"
+      } else {
+        relationship_type <- "Inverted Unimodal"
+      }
+      deviance_explained <- deviance_explained_quadratic
+    } else {
+      relationship_type <- "Non-significant"
+      deviance_explained <- max(deviance_explained_linear, deviance_explained_quadratic)
+    }
+  } else {
+    
+    if (quadratic_aic < linear_aic) {
+      quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+      quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+      deviance_explained <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+      if (quad_p < 0.1) {
+        if (quad_coef < 0) {
+          relationship_type <- "Unimodal"
+        } else {
+          relationship_type <- "Inverted Unimodal"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    } else {
+      linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+      linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+      deviance_explained <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+
+      if (linear_p < 0.1) {
+        if (linear_coef > 0) {
+          relationship_type <- "Positive Linear"
+        } else {
+          relationship_type <- "Negative Linear"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    }
+  }
+
+  return(list(
+    Remove = Remove,
+    Reason = Reason,
+    Distribution_Info = distribution_info,
+    Relationship_Type = relationship_type,
+    Deviance_Explained = deviance_explained
+  ))
+}
+
+data_results <- lapply(split(data, data$Dataset), process_dataset)
+
+results_df <- data.frame(
+  Dataset = names(data_results),
+  Relationship_Type_FRic = sapply(data_results, function(x) x$Relationship_Type),
+  Deviance_Explained_FRic = sapply(data_results, function(x) x$Deviance_Explained)
+)
+
+result <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Organism = first(Organism),
+    Data = first(Data),
+    Num = mean(Num, na.rm = TRUE),
+    Area = mean(Area, na.rm = TRUE),
+    Median_TP = median(TP, na.rm = TRUE),
+    Median_AT = median(AT, na.rm = TRUE),
+    Median_AP = median(AP, na.rm = TRUE),
+    Median_Elevation = median(Elevation, na.rm = TRUE),
+    Median_AL = median(AL, na.rm = TRUE),
+    TP_Range = max(TP, na.rm = TRUE) - min(TP, na.rm = TRUE),
+    AT_Range = max(AT, na.rm = TRUE) - min(AT, na.rm = TRUE),
+    AP_Range = max(AP, na.rm = TRUE) - min(AP, na.rm = TRUE),
+    Elevation_Range = max(Elevation, na.rm = TRUE) - min(Elevation, na.rm = TRUE),
+    AL_Range = max(AL, na.rm = TRUE) - min(AL, na.rm = TRUE),
+  ) %>%
+  left_join(results_df, by = "Dataset") %>%
+  distinct()
+
+
+data <- data %>%left_join(result, by = "Dataset")
+
+#write.csv(result, file = "result_FRic.csv")
+#write.csv(data, file = "All_data_FRic.csv")
+```
+
+# Shape define FDis
+```{r}
+
+data=data[!is.na(data$FDis) & !is.na(data$logTP), ]
+
+
+process_dataset <- function(df) {
+  Remove <- FALSE
+  Reason <- "Processed"
+
+  skewness_logTP <- tryCatch({
+    skewness(df$logTP, na.rm = TRUE)
+  }, error = function(e) NA)
+
+  sd_logTP <- sd(df$logTP, na.rm = TRUE)
+
+  logTP_iqr <- IQR(df$logTP, na.rm = TRUE)
+  logTP_q1 <- quantile(df$logTP, 0.25, na.rm = TRUE)
+  logTP_q3 <- quantile(df$logTP, 0.75, na.rm = TRUE)
+  logTP_outliers <- sum(df$logTP < (logTP_q1 - 1.5 * logTP_iqr) | 
+                        df$logTP > (logTP_q3 + 1.5 * logTP_iqr), na.rm = TRUE)
+  outlier_ratio <- logTP_outliers / nrow(df)
+
+  distribution_info <- list(
+    Skewness = skewness_logTP,
+    Standard_Deviation = sd_logTP,
+    Outlier_Ratio = outlier_ratio
+  )
+
+  linear_model <- glm(FDis ~ logTP, data = df, family = gaussian())
+  quadratic_model <- glm(FDis ~ logTP + I(logTP^2), data = df, family = gaussian())
+
+  linear_aic <- AIC(linear_model)
+  quadratic_aic <- AIC(quadratic_model)
+
+  if (abs(linear_aic - quadratic_aic) < 3) {
+    linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+    linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+    quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+    quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+
+    deviance_explained_linear <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+    deviance_explained_quadratic <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+    if (linear_p < 0.1) {
+      if (linear_coef > 0) {
+        relationship_type <- "Positive Linear"
+      } else {
+        relationship_type <- "Negative Linear"
+      }
+      deviance_explained <- deviance_explained_linear
+    } else if (quad_p < 0.1) {
+      if (quad_coef < 0) {
+        relationship_type <- "Unimodal"
+      } else {
+        relationship_type <- "Inverted Unimodal"
+      }
+      deviance_explained <- deviance_explained_quadratic
+    } else {
+      relationship_type <- "Non-significant"
+      deviance_explained <- max(deviance_explained_linear, deviance_explained_quadratic)
+    }
+  } else {
+
+    if (quadratic_aic < linear_aic) {
+      quad_p <- summary(quadratic_model)$coefficients["I(logTP^2)", "Pr(>|t|)"]
+      quad_coef <- summary(quadratic_model)$coefficients["I(logTP^2)", "Estimate"]
+      deviance_explained <- (1 - quadratic_model$deviance / quadratic_model$null.deviance) * 100
+
+      if (quad_p < 0.1) {
+        if (quad_coef < 0) {
+          relationship_type <- "Unimodal"
+        } else {
+          relationship_type <- "Inverted Unimodal"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    } else {
+      linear_p <- summary(linear_model)$coefficients["logTP", "Pr(>|t|)"]
+      linear_coef <- summary(linear_model)$coefficients["logTP", "Estimate"]
+      deviance_explained <- (1 - linear_model$deviance / linear_model$null.deviance) * 100
+
+      if (linear_p < 0.1) {
+        if (linear_coef > 0) {
+          relationship_type <- "Positive Linear"
+        } else {
+          relationship_type <- "Negative Linear"
+        }
+      } else {
+        relationship_type <- "Non-significant"
+      }
+    }
+  }
+
+  return(list(
+    Remove = Remove,
+    Reason = Reason,
+    Distribution_Info = distribution_info,
+    Relationship_Type = relationship_type,
+    Deviance_Explained = deviance_explained
+  ))
+}
+
+data_results <- lapply(split(data, data$Dataset), process_dataset)
+
+results_df <- data.frame(
+  Dataset = names(data_results),
+  Relationship_Type_FDis = sapply(data_results, function(x) x$Relationship_Type),
+  Deviance_Explained_FDis = sapply(data_results, function(x) x$Deviance_Explained)
+)
+
+result <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Organism = first(Organism),
+    Data = first(Data),
+    Num = mean(Num, na.rm = TRUE),
+    Area = mean(Area, na.rm = TRUE),
+    Median_TP = median(TP, na.rm = TRUE),
+    Median_AT = median(AT, na.rm = TRUE),
+    Median_AP = median(AP, na.rm = TRUE),
+    Median_Elevation = median(Elevation, na.rm = TRUE),
+    Median_AL = median(AL, na.rm = TRUE),
+    TP_Range = max(TP, na.rm = TRUE) - min(TP, na.rm = TRUE),
+    AT_Range = max(AT, na.rm = TRUE) - min(AT, na.rm = TRUE),
+    AP_Range = max(AP, na.rm = TRUE) - min(AP, na.rm = TRUE),
+    Elevation_Range = max(Elevation, na.rm = TRUE) - min(Elevation, na.rm = TRUE),
+    AL_Range = max(AL, na.rm = TRUE) - min(AL, na.rm = TRUE),
+  ) %>%
+  left_join(results_df, by = "Dataset") %>%
+  distinct()
+
+
+data <- data %>%left_join(result, by = "Dataset")
+
+#write.csv(result, file = "result_FDis.csv")
+#write.csv(data, file = "All_data_FDis.csv")
+```

@@ -1,0 +1,293 @@
+
+#SEM Richness
+```{r}
+
+library(piecewiseSEM)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(ggdag)
+library(stringr)
+library(e1071)
+library(lme4)
+
+data=read.csv("result_all.csv")
+
+
+data <- data %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD21","BD19")))
+data_sem <- data %>% 
+  select(Organism, Group,Data, Area, Median_TP, Median_AT, Median_AP, Median_Elevation, Median_AL, Area, Relationship_Type, TP_Range, AT_Range, AP_Range, Elevation_Range, AL_Range) %>%
+  rename(
+    TP = Median_TP,      
+    AT = Median_AT,               
+    AP = Median_AP,               
+    Elevation = Median_Elevation,  
+    Latitude = Median_AL,         
+    Area = Area,                 
+    Relationships = Relationship_Type, 
+    TP_Range = TP_Range,           
+    AT_Range = AT_Range,          
+    AP_Range = AP_Range,          
+    Elevation_Range = Elevation_Range, 
+    AL_Range = AL_Range   
+  ) %>%
+  mutate(
+    NegLinear = ifelse(Relationships == "Negative Linear", 1, 0),
+    Unimodal = ifelse(Relationships == "Unimodal", 1, 0),
+    PosLinear = ifelse(Relationships == "Positive Linear", 1, 0),
+    NonSignificant = ifelse(Relationships == "Non-significant", 1, 0) 
+  ) %>%
+  select(-Relationships)
+
+data_sem$Group <- as.factor(data_sem$Group)
+data_sem$Data <- as.factor(data_sem$Data) 
+
+
+mod_productivity <- lm(TP ~ AT + AP, data = data_sem)
+mod_at <- lm(AT ~ Elevation + Latitude, data = data_sem)
+mod_ap <- lm(AP ~ Elevation + Latitude, data = data_sem)
+
+
+mod_range <- lm(TP_Range ~ TP, data = data_sem)  
+
+mod_neglinear <- glm(NegLinear ~ TP + TP_Range, 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_unimodal <- glm(Unimodal ~ TP + TP_Range, 
+                      family = binomial(link = "logit"), data = data_sem)
+mod_poslinear <- glm(PosLinear ~ TP + TP_Range, 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_nonsignificant <- glm(NonSignificant ~ TP + TP_Range, 
+                            family = binomial(link = "logit"), data = data_sem)
+
+
+sem_model <- psem(
+  mod_productivity,
+  mod_at,
+  mod_ap,
+  mod_range,
+  mod_neglinear,
+  mod_unimodal,
+  mod_poslinear,
+  mod_nonsignificant
+)
+
+
+fisherC(sem_model)
+R21 = rsquared(sem_model)
+
+coefs <- coefs(sem_model)
+print(coefs)
+
+plot(sem_model)
+
+```
+
+#SEM Shannon
+```{r}
+
+# First four: not TP, AP05-08: lack abundance, PP06: lack abundance.
+data <- data %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18","AP05","AP06","AP07","AP08","PP06")))
+data_sem <- data %>% 
+  select(Organism, Data, Area, Median_TP, Median_AT, Median_AP, Median_Elevation, Median_AL, Area, Relationship_Type_Shannon, TP_Range, AT_Range, AP_Range, Elevation_Range, AL_Range) %>%
+  rename(
+    TP = Median_TP,      
+    AT = Median_AT,                
+    AP = Median_AP,                
+    Elevation = Median_Elevation, 
+    Latitude = Median_AL,         
+    Area = Area,                  
+    Relationships = Relationship_Type_Shannon,
+    TP_Range = TP_Range,          
+    AT_Range = AT_Range,          
+    AP_Range = AP_Range,          
+    Elevation_Range = Elevation_Range, 
+    AL_Range = AL_Range           
+  ) %>%
+  mutate(
+    NegLinear = ifelse(Relationships == "Negative Linear", 1, 0),
+    Unimodal = ifelse(Relationships == "Unimodal", 1, 0),
+    PosLinear = ifelse(Relationships == "Positive Linear", 1, 0),
+    NonSignificant = ifelse(Relationships == "Non-significant", 1, 0) 
+  ) %>%
+  select(-Relationships)  
+
+
+mod_productivity <- lm(TP ~ AT + AP, data = data_sem)
+mod_at <- lm(AT ~ Elevation + Latitude, data = data_sem)
+mod_ap <- lm(AP ~ Elevation + Latitude, data = data_sem)
+
+mod_range <- lm(TP_Range ~ TP, data = data_sem)  
+
+mod_neglinear <- glm(NegLinear ~ TP + TP_Range, 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_unimodal <- glm(Unimodal ~ TP + TP_Range, 
+                      family = binomial(link = "logit"), data = data_sem)
+mod_poslinear <- glm(PosLinear ~ TP + TP_Range , 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_nonsignificant <- glm(NonSignificant ~ TP + TP_Range , 
+                            family = binomial(link = "logit"), data = data_sem)
+
+
+sem_model <- psem(
+  mod_productivity,
+  mod_at,
+  mod_ap,
+  mod_range, 
+  mod_neglinear,
+  mod_unimodal,
+  mod_poslinear,
+  mod_nonsignificant
+)
+
+
+fisherC(sem_model)
+R21 = rsquared(sem_model)
+
+coefs <- coefs(sem_model)
+print(coefs)
+
+plot(sem_model)
+```
+
+
+#SEM FRic
+```{r}
+
+
+data <- data %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18","BM11","AP05","AP06","AP07","AP08")))
+data_sem <- data %>% 
+  select(Organism, Data, Area, Median_TP, Median_AT, Median_AP, Median_Elevation, Median_AL, Area, Relationship_Type_FRic, TP_Range, AT_Range, AP_Range, Elevation_Range, AL_Range) %>%
+  rename(
+    Productivity = Median_TP,      
+    AT = Median_AT,               
+    AP = Median_AP,               
+    Elevation = Median_Elevation, 
+    Latitude = Median_AL,          
+    Area = Area,                 
+    Relationships = Relationship_Type_FRic, 
+    TP_Range = TP_Range,           
+    AT_Range = AT_Range,           
+    AP_Range = AP_Range,          
+    Elevation_Range = Elevation_Range, 
+    AL_Range = AL_Range           
+  ) %>%
+  mutate(
+    NegLinear = ifelse(Relationships == "Negative Linear", 1, 0),
+    Unimodal = ifelse(Relationships == "Unimodal", 1, 0),
+    PosLinear = ifelse(Relationships == "Positive Linear", 1, 0),
+    NonSignificant = ifelse(Relationships == "Non-significant", 1, 0) 
+  ) %>%
+  select(-Relationships)  
+
+
+
+head(data_sem)
+str(data_sem)
+
+mod_productivity <- lm(Productivity ~ AT + AP, data = data_sem)
+mod_at <- lm(AT ~ Elevation + Latitude, data = data_sem)
+mod_ap <- lm(AP ~ Elevation + Latitude, data = data_sem)
+
+mod_range <- lm(TP_Range ~ Productivity, data = data_sem) 
+
+mod_neglinear <- glm(NegLinear ~ Productivity + TP_Range, 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_unimodal <- glm(Unimodal ~ Productivity + TP_Range, 
+                      family = binomial(link = "logit"), data = data_sem)
+mod_poslinear <- glm(PosLinear ~ Productivity + TP_Range , 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_nonsignificant <- glm(NonSignificant ~ Productivity + TP_Range , 
+                            family = binomial(link = "logit"), data = data_sem)
+
+
+sem_model <- psem(
+  mod_productivity,
+  mod_at,
+  mod_ap,
+  mod_range,
+  mod_neglinear,
+  mod_unimodal,
+  mod_poslinear,
+  mod_nonsignificant
+)
+
+
+fisherC(sem_model)
+R21 = rsquared(sem_model)
+
+coefs <- coefs(sem_model)
+print(coefs)
+
+plot(sem_model)
+```
+
+#SEM FDis
+```{r}
+
+data <- data %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18","AP05","AP06","AP07","AP08","PP06")))
+data_sem <- data %>% 
+  select(Organism, Data, Area, Median_TP, Median_AT, Median_AP, Median_Elevation, Median_AL, Area, Relationship_Type_FDis, TP_Range, AT_Range, AP_Range, Elevation_Range, AL_Range) %>%
+  rename(
+    TP = Median_TP,      
+    AT = Median_AT,               
+    AP = Median_AP,              
+    Elevation = Median_Elevation,  
+    Latitude = Median_AL,         
+    Area = Area,                   
+    Relationships = Relationship_Type_FDis, 
+    TP_Range = TP_Range,         
+    AT_Range = AT_Range,          
+    AP_Range = AP_Range,           
+    Elevation_Range = Elevation_Range,
+    AL_Range = AL_Range           
+  ) %>%
+  mutate(
+    NegLinear = ifelse(Relationships == "Negative Linear", 1, 0),
+    Unimodal = ifelse(Relationships == "Unimodal", 1, 0),
+    PosLinear = ifelse(Relationships == "Positive Linear", 1, 0),
+    NonSignificant = ifelse(Relationships == "Non-significant", 1, 0) 
+  ) %>%
+  select(-Relationships)  
+
+
+mod_productivity <- lm(TP ~ AT + AP, data = data_sem)
+mod_at <- lm(AT ~ Elevation + Latitude, data = data_sem)
+mod_ap <- lm(AP ~ Elevation + Latitude, data = data_sem)
+
+
+mod_range <- lm(TP_Range ~ TP, data = data_sem) 
+
+mod_neglinear <- glm(NegLinear ~ TP + TP_Range, 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_unimodal <- glm(Unimodal ~ TP + TP_Range, 
+                      family = binomial(link = "logit"), data = data_sem)
+mod_poslinear <- glm(PosLinear ~ TP + TP_Range , 
+                       family = binomial(link = "logit"), data = data_sem)
+mod_nonsignificant <- glm(NonSignificant ~ TP + TP_Range , 
+                            family = binomial(link = "logit"), data = data_sem)
+
+
+sem_model <- psem(
+  mod_productivity,
+  mod_at,
+  mod_ap,
+  mod_range,
+  mod_neglinear,
+  mod_unimodal,
+  mod_poslinear,
+  mod_nonsignificant
+)
+
+
+fisherC(sem_model)
+R21 = rsquared(sem_model)
+
+coefs <- coefs(sem_model)
+print(coefs)
+
+plot(sem_model)
+```

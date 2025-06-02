@@ -1,0 +1,679 @@
+# Relationship Richness
+```{r}
+
+library(ggplot2)
+library(patchwork)
+library(ggforce)
+library(ggExtra)
+library(ggsignif)
+library(multcompView)
+
+#result=read.csv(file = "result_all.csv")
+
+result <- result %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18"))) %>% 
+  mutate(
+    Median_TP = log(Median_TP), 
+    TP_Range = log(TP_Range)
+  )
+
+dist_matrix <- dist(result[, c("Median_TP", "TP_Range")])  
+adonis_result <- adonis2(dist_matrix ~ Relationship_Type, data = result, permutations = 999)
+
+
+r2_value <- round(adonis_result$R2[1], 3)
+p_value <- signif(adonis_result$`Pr(>F)`[1], 3)
+
+
+scatter_plot <-
+  ggplot() +
+
+  geom_point(data = result[result$Relationship_Type == "Non-significant", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type),
+             size = 6, alpha = 0.9) +
+ 
+  geom_point(data = result[result$Relationship_Type == "Unimodal", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type),
+             size = 6, alpha = 0.9) +
+
+  #geom_point(data = result[result$Relationship_Type == "Unimodal Upwards", ],
+            # aes(x = Median_TP, y = TP_Range, color = Relationship_Type),
+             #size = 6, alpha = 0.9) +
+
+  geom_point(data = result[result$Relationship_Type == "Negative Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type),
+             size = 6, alpha = 0.9) +
+
+  geom_point(data = result[result$Relationship_Type == "Positive Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type),
+             size = 6, alpha = 0.9) +
+
+  scale_color_manual(
+    name = "Relationship Shape",
+    values = c(
+      "Positive Linear" = "#0074b3", 
+      "Negative Linear" = "skyblue", 
+      "Unimodal Upwards" = "#f8984e", 
+      "Unimodal" = "#db6968", 
+      "Non-significant" = "gray"
+    )
+  ) +
+  labs(
+    x = "Median Total Phosphorus",
+    y = "Total Phosphorus Range"
+  ) +
+ theme_minimal() +
+  theme(
+    legend.position = c(0.634, 0.326),  
+    legend.justification = c(0, 1), 
+    legend.background = element_rect(fill = "white", color = "black"), 
+    plot.title = element_text(hjust = 0.5),
+     panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    axis.line = element_blank()  
+  )
+
+anova_result <- aov(Median_TP ~ Relationship_Type, data = result)
+summary(aov(Median_TP ~ Relationship_Type, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+anova_result <- aov(TP_Range ~ Relationship_Type, data = result)
+summary(aov(TP_Range ~ Relationship_Type, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+
+print(tukey_result)
+
+
+significance_data_top <- data.frame(
+  Relationship_Type = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  Median_TP = c(0.8, 0.6, 0.4, 0.2), 
+  label = c("a", "b", "ab", "c")
+)
+
+significance_data_right <- data.frame(
+  Relationship_Type = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  TP_Range = c(0.8, 0.6, 0.4, 0.2),  
+  label = c("a", "b", "ab", "c")
+)
+
+boxplot_top <- ggplot(result, aes(y = Relationship_Type, x = Median_TP, fill = Relationship_Type)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    axis.title = element_blank(),
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+
+boxplot_right <- ggplot(result, aes(y = TP_Range, x = Relationship_Type, fill = Relationship_Type)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+
+annotation_plot <- ggplot() +
+  theme_minimal() + 
+  annotate(
+    "text",
+    x = 0.5, y = 0.5,
+    label = paste0("PERMANOVA:\ndf = 3\nR² = ", round(r2_value, 5), "\nP = ", p_value),
+    size = 3,  
+    hjust = 0.5,
+    vjust = 0.5,
+    fontface = "bold" 
+  ) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    axis.title = element_blank(),  
+    axis.text = element_blank(),  
+     panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  )
+
+final_plot <- (
+  boxplot_top + annotation_plot +
+  scatter_plot + boxplot_right
+) +
+  plot_layout(
+    heights = c(1, 4),
+    widths = c(4, 1),
+    ncol = 2,
+    nrow = 2
+  )
+
+print(final_plot)
+
+#ggsave("Relation_final_Richness.pdf",  width = 6, height = 6)
+```
+
+# Relationship plot FRic
+```{r}
+
+result <- result %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18","BM11","AP05","AP06","AP07","AP08"))) %>%  
+  mutate(
+    Median_TP = log(Median_TP), 
+    TP_Range = log(TP_Range)
+  )
+
+dist_matrix <- dist(result[, c("Median_TP", "TP_Range")]) 
+adonis_result <- adonis2(dist_matrix ~ Relationship_Type_FRic, data = result, permutations = 999)
+
+r2_value <- round(adonis_result$R2[1], 3)
+p_value <- signif(adonis_result$`Pr(>F)`[1], 3)
+
+
+scatter_plot <-
+  ggplot() +
+  geom_point(data = result[result$Relationship_Type_FRic == "Non-significant", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FRic),
+             size = 6, alpha = 0.9) +
+
+  geom_point(data = result[result$Relationship_Type_FRic == "Unimodal", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FRic),
+             size = 6, alpha = 0.9) +
+  #geom_point(data = result[result$Relationship_Type_FRic == "Unimodal Upwards", ],
+            # aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FRic),
+             #size = 6, alpha = 0.9) +
+  geom_point(data = result[result$Relationship_Type_FRic == "Negative Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FRic),
+             size = 6, alpha = 0.9) +
+  geom_point(data = result[result$Relationship_Type_FRic == "Positive Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FRic),
+             size = 6, alpha = 0.9) +
+  scale_color_manual(
+    name = "Relationship Shape",
+    values = c(
+      "Positive Linear" = "#0074b3", 
+      "Negative Linear" = "skyblue",
+      "Unimodal Upwards" = "#f8984e", 
+      "Unimodal" = "#db6968",
+      "Non-significant" = "gray" 
+    )
+  ) +
+  labs(
+    x = "Median Total Phosphorus",
+    y = "Total Phosphorus Range"
+  ) +
+ theme_minimal() +
+  theme(
+    legend.position = c(0.634, 0.326),  
+    legend.justification = c(0, 1), 
+    legend.background = element_rect(fill = "white", color = "black"),  
+    plot.title = element_text(hjust = 0.5),
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    axis.line = element_blank()  
+  )
+
+anova_result <- aov(Median_TP ~ Relationship_Type_FRic, data = result)
+summary(aov(Median_TP ~ Relationship_Type_FRic, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+anova_result <- aov(TP_Range ~ Relationship_Type_FRic, data = result)
+summary(aov(TP_Range ~ Relationship_Type_FRic, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+
+print(tukey_result)
+
+
+significance_data_top <- data.frame(
+  Relationship_Type_FRic = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  Median_TP = c(0.8, 0.6, 0.4, 0.2), 
+  label = c("a", "b", "ab", "c")
+)
+
+significance_data_right <- data.frame(
+  Relationship_Type_FRic = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  TP_Range = c(0.8, 0.6, 0.4, 0.2),
+  label = c("a", "b", "ab", "c")
+)
+
+boxplot_top <- ggplot(result, aes(y = Relationship_Type_FRic, x = Median_TP, fill = Relationship_Type_FRic)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+     panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+
+boxplot_right <- ggplot(result, aes(y = TP_Range, x = Relationship_Type_FRic, fill = Relationship_Type_FRic)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+annotation_plot <- ggplot() +
+  theme_minimal() +  
+  annotate(
+    "text",
+    x = 0.5, y = 0.5,
+    label = paste0("PERMANOVA:\ndf = 3\nR² = ", round(r2_value, 5), "\nP = ", p_value),
+    size = 3,  
+    hjust = 0.5,
+    vjust = 0.5,
+    fontface = "bold" 
+  ) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    axis.title = element_blank(),  
+    axis.text = element_blank(),  
+    axis.ticks = element_blank(),  
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    legend.position = "none"
+  )
+
+final_plot <- (
+  boxplot_top + annotation_plot +
+  scatter_plot + boxplot_right
+) +
+  plot_layout(
+    heights = c(1, 4),
+    widths = c(4, 1),
+    ncol = 2,
+    nrow = 2
+  )
+
+
+print(final_plot)
+
+
+ggsave("Relation_final_FRic.pdf",  width = 6, height = 6)
+```
+
+# Relationship plot Shannon
+```{r}
+
+result <- result %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18","AP05","AP06","AP07","AP08","PP06","BM08","PP01"))) %>%  
+  mutate(
+    Median_TP = log(Median_TP), 
+    TP_Range = log(TP_Range)
+  )
+
+dist_matrix <- dist(result[, c("Median_TP", "TP_Range")]) 
+adonis_result <- adonis2(dist_matrix ~ Relationship_Type_Shannon, data = result, permutations = 999)
+
+r2_value <- round(adonis_result$R2[1], 3)
+p_value <- signif(adonis_result$`Pr(>F)`[1], 3)
+
+
+scatter_plot <-
+  ggplot() +
+
+  geom_point(data = result[result$Relationship_Type_Shannon == "Non-significant", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_Shannon),
+             size = 6, alpha = 0.9) +
+  geom_point(data = result[result$Relationship_Type_Shannon == "Unimodal", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_Shannon),
+             size = 6, alpha = 0.9) +
+
+  #geom_point(data = result[result$Relationship_Type_Shannon == "Unimodal Upwards", ],
+            # aes(x = Median_TP, y = TP_Range, color = Relationship_Type_Shannon),
+             #size = 6, alpha = 0.9) +
+  geom_point(data = result[result$Relationship_Type_Shannon == "Negative Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_Shannon),
+             size = 6, alpha = 0.9) +
+  geom_point(data = result[result$Relationship_Type_Shannon == "Positive Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_Shannon),
+             size = 6, alpha = 0.9) +
+  scale_color_manual(
+    name = "Relationship Shape",
+    values = c(
+      "Positive Linear" = "#0074b3", 
+      "Negative Linear" = "skyblue", 
+      "Unimodal Upwards" = "#f8984e", 
+      "Unimodal" = "#db6968", 
+      "Non-significant" = "gray"
+    )
+  ) +
+  labs(
+    x = "Median Total Phosphorus",
+    y = "Total Phosphorus Range"
+  ) +
+ theme_minimal() +
+  theme(
+    legend.position = c(0.634, 0.326),  
+    legend.justification = c(0, 1),  
+    legend.background = element_rect(fill = "white", color = "black"), 
+    plot.title = element_text(hjust = 0.5),
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    axis.line = element_blank() 
+  )
+
+anova_result <- aov(Median_TP ~ Relationship_Type_Shannon, data = result)
+summary(aov(Median_TP ~ Relationship_Type_Shannon, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+anova_result <- aov(TP_Range ~ Relationship_Type_Shannon, data = result)
+summary(aov(TP_Range ~ Relationship_Type_Shannon, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+
+print(tukey_result)
+
+
+significance_data_top <- data.frame(
+  Relationship_Type_Shannon = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  Median_TP = c(0.8, 0.6, 0.4, 0.2),  
+  label = c("a", "b", "ab", "c")
+)
+
+significance_data_right <- data.frame(
+  Relationship_Type_Shannon = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  TP_Range = c(0.8, 0.6, 0.4, 0.2),  
+  label = c("a", "b", "ab", "c")
+)
+
+boxplot_top <- ggplot(result, aes(y = Relationship_Type_Shannon, x = Median_TP, fill = Relationship_Type_Shannon)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+
+
+boxplot_right <- ggplot(result, aes(y = TP_Range, x = Relationship_Type_Shannon, fill = Relationship_Type_Shannon)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+
+annotation_plot <- ggplot() +
+  theme_minimal() +
+  annotate(
+    "text",
+    x = 0.5, y = 0.5,
+    label = paste0("PERMANOVA:\ndf = 3\nR² = ", round(r2_value, 5), "\nP = ", p_value),
+    size = 3, 
+    hjust = 0.5,
+    vjust = 0.5,
+    fontface = "bold" 
+  ) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    axis.title = element_blank(), 
+    axis.text = element_blank(),  
+    axis.ticks = element_blank(),  
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    legend.position = "none"
+  )
+
+final_plot <- (
+  boxplot_top + annotation_plot +
+  scatter_plot + boxplot_right
+) +
+  plot_layout(
+    heights = c(1, 4),
+    widths = c(4, 1),
+    ncol = 2,
+    nrow = 2
+  )
+
+print(final_plot)
+
+
+ggsave("Relation_final_Shannon.pdf",  width = 6, height = 6)
+```
+
+
+# Relationship plot FDis
+```{r}
+
+
+result <- result %>%
+  filter(!(Dataset %in% c("BM23", "BM24", "BD20", "BD18","PP07","AP05","AP06","AP07","AP08","PP06"))) %>%  
+  mutate(
+    Median_TP = log(Median_TP), 
+    TP_Range = log(TP_Range)
+  )
+
+dist_matrix <- dist(result[, c("Median_TP", "TP_Range")]) 
+adonis_result <- adonis2(dist_matrix ~ Relationship_Type_FDis, data = result, permutations = 999)
+
+r2_value <- round(adonis_result$R2[1], 3)
+p_value <- signif(adonis_result$`Pr(>F)`[1], 3)
+
+
+scatter_plot <-
+  ggplot() +
+ 
+  geom_point(data = result[result$Relationship_Type_FDis == "Non-significant", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FDis),
+             size = 6, alpha = 0.9) +
+ 
+  geom_point(data = result[result$Relationship_Type_FDis == "Unimodal", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FDis),
+             size = 6, alpha = 0.9) +
+ 
+  #geom_point(data = result[result$Relationship_Type_FDis == "Unimodal Upwards", ],
+            # aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FDis),
+             #size = 6, alpha = 0.9) +
+
+  geom_point(data = result[result$Relationship_Type_FDis == "Negative Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FDis),
+             size = 6, alpha = 0.9) +
+
+  geom_point(data = result[result$Relationship_Type_FDis == "Positive Linear", ],
+             aes(x = Median_TP, y = TP_Range, color = Relationship_Type_FDis),
+             size = 6, alpha = 0.9) +
+
+  scale_color_manual(
+    name = "Relationship Shape",
+    values = c(
+      "Positive Linear" = "#0074b3", 
+      "Negative Linear" = "skyblue",
+      "Unimodal Upwards" = "#f8984e", 
+      "Unimodal" = "#db6968",
+      "Non-significant" = "gray" 
+    )
+  ) +
+  labs(
+    x = "Median Total Phosphorus",
+    y = "Total Phosphorus Range"
+  ) +
+ theme_minimal() +
+  theme(
+    legend.position = c(0.634, 0.326),  
+    legend.justification = c(0, 1),   
+    legend.background = element_rect(fill = "white", color = "black"),  
+    plot.title = element_text(hjust = 0.5),
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    axis.line = element_blank()   
+  )
+
+anova_result <- aov(Median_TP ~ Relationship_Type_FDis, data = result)
+summary(aov(Median_TP ~ Relationship_Type_FDis, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+anova_result <- aov(TP_Range ~ Relationship_Type_FDis, data = result)
+summary(aov(TP_Range ~ Relationship_Type_FDis, data = result))
+tukey_result <- TukeyHSD(anova_result)
+
+print(tukey_result)
+
+significance_data_top <- data.frame(
+  Relationship_Type_FDis = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  Median_TP = c(0.8, 0.6, 0.4, 0.2), 
+  label = c("a", "b", "ab", "c")
+)
+
+significance_data_right <- data.frame(
+  Relationship_Type_FDis = c("Unimodal", "Positive Linear", "Non-significant", "Negative Linear"),
+  TP_Range = c(0.8, 0.6, 0.4, 0.2),  
+  label = c("a", "b", "ab", "c")
+)
+
+boxplot_top <- ggplot(result, aes(y = Relationship_Type_FDis, x = Median_TP, fill = Relationship_Type_FDis)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+     panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+
+boxplot_right <- ggplot(result, aes(y = TP_Range, x = Relationship_Type_FDis, fill = Relationship_Type_FDis)) +
+  geom_boxplot(outlier.shape = NA, width = 0.5, color = "black") +
+  scale_fill_manual(values = c(
+    "Positive Linear" = "#0074b3",
+    "Negative Linear" = "skyblue",
+    "Unimodal Upwards" = "#f8984e",
+    "Unimodal" = "#db6968",
+    "Non-significant" = "gray"
+  )) +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+     panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) 
+
+annotation_plot <- ggplot() +
+  theme_minimal() +  
+  annotate(
+    "text",
+    x = 0.5, y = 0.5,
+    label = paste0("PERMANOVA:\ndf = 3\nR² = ", round(r2_value, 5), "\nP = ", p_value),
+    size = 3,  # 调小文字大小
+    hjust = 0.5,
+    vjust = 0.5,
+    fontface = "bold" 
+  ) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    axis.title = element_blank(), 
+    axis.text = element_blank(),
+    axis.ticks = element_blank(), 
+     panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(), 
+    legend.position = "none"
+  )
+
+final_plot <- (
+  boxplot_top + annotation_plot +
+  scatter_plot + boxplot_right
+) +
+  plot_layout(
+    heights = c(1, 4),
+    widths = c(4, 1),
+    ncol = 2,
+    nrow = 2
+  )
+
+print(final_plot)
+
+
+ggsave("Relation_final_FDis.pdf",  width = 6, height = 6)
+```

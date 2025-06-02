@@ -1,0 +1,841 @@
+
+# Box plot Richness 25/75
+```{r}
+data=read.csv("All_data.csv")
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.75) ~ "High",
+      TP <= quantile(TP, 0.25) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+Box_Richness <-
+  ggplot(data, aes(x = Dataset, y = Richness, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "Richness") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid = element_blank(),   
+    strip.text = element_text(size = 20, hjust = 0)
+  ) +
+  scale_fill_manual(values = c("Low" = "#99cbeb", "High" = "#547ac0")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26, hjust = 0)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1),  
+      symbols = c("*", "")       
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+
+plot(Box_Richness)
+
+#ggsave("Box_Richness.pdf", plot = Box_Richness, device = "pdf", width = 14, height =7)
+
+
+results <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(Richness[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(Richness[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(Richness[Eutrophic_Group == "Low"]) > 0 & length(Richness[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        Richness[Eutrophic_Group == "Low"],
+        Richness[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(FRic))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+
+```
+
+# Box plot Shannon 25/75
+```{r}
+
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.75) ~ "High",
+      TP <= quantile(TP, 0.25) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(Shannon))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+# 过滤掉这些 Dataset 所对应的所有行
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+data_filtered <- data %>%
+  filter(!Dataset == "PP06")
+
+
+Box_Shannon <-
+  ggplot(data_filtered, aes(x = Dataset, y = Shannon, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "Shannon") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  # 保留外部边框
+    panel.grid = element_blank(),    # 去掉所有内部网格线
+    strip.text = element_text(size = 20)  # 调整分面标签字体大小
+  ) +
+  scale_fill_manual(values = c("Low" = "#99cbeb", "High" = "#547ac0")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26)  # 调整Organism标签字体大小
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1),  # 定义p值的分段
+      symbols = c("*", "")       # 显著性符号：显著为“*”，非显著为空
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+plot(Box_Shannon)
+
+#ggsave("D:/Desktop/Data/R/output/Box_Shannon.pdf", plot = Box_Shannon, device = "pdf", width = 14, height =7)
+
+
+results <- data_filtered %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(Shannon[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(Shannon[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(Shannon[Eutrophic_Group == "Low"]) > 0 & length(Shannon[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        Shannon[Eutrophic_Group == "Low"],
+        Shannon[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+
+
+```
+
+# Box plot FDis 25/75
+```{r}
+
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.75) ~ "High",
+      TP <= quantile(TP, 0.25) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(FDis))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+data_filtered <- data %>%
+  filter(!Dataset == "PP06")
+
+data_filtered <- data_filtered %>%
+  filter(!is.na(FDis), is.finite(FDis))
+
+Box_FDis <-
+  ggplot(data_filtered, aes(x = Dataset, y = FDis, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "FDis") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid = element_blank(),  
+    strip.text = element_text(size = 20) 
+  ) +
+  scale_fill_manual(values = c("Low" = "#fce4d4", "High" = "#ffc48a")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1),  
+      symbols = c("*", "")       
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+plot(Box_FDis)
+
+#ggsave("Box_FDis.pdf", plot = Box_FDis, device = "pdf", width = 14, height =7)
+
+
+results <- data_filtered %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(FDis[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(FDis[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(FDis[Eutrophic_Group == "Low"]) > 0 & length(FDis[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        FDis[Eutrophic_Group == "Low"],
+        FDis[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+
+
+
+```
+
+# Box plot FEve 25/75
+```{r}
+
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.75) ~ "High",
+      TP <= quantile(TP, 0.25) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(FEve))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+data_filtered <- data %>%
+  filter(!Dataset == "PP06")
+
+data_filtered <- data_filtered %>%
+  filter(!is.na(FEve), is.finite(FEve))
+
+Box_FEve <-
+  ggplot(data_filtered, aes(x = Dataset, y = FEve, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "FEve") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    panel.grid = element_blank(),    
+    strip.text = element_text(size = 20)  
+  ) +
+  scale_fill_manual(values = c("Low" = "#fce4d4", "High" = "#ffc48a")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1),
+      symbols = c("*", "")    
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+plot(Box_FEve)
+
+#ggsave("Box_FEve.pdf", plot = Box_FEve, device = "pdf", width = 14, height =7)
+
+
+results <- data_filtered %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(FEve[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(FEve[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(FEve[Eutrophic_Group == "Low"]) > 0 & length(FEve[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        FEve[Eutrophic_Group == "Low"],
+        FEve[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+
+
+
+```
+
+# Box plot Richness 15/85
+```{r}
+data=read.csv("All_data.csv")
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.85) ~ "High",
+      TP <= quantile(TP, 0.15) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+Box_Richness <-
+  ggplot(data, aes(x = Dataset, y = Richness, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "Richness") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    panel.grid = element_blank(),    
+    strip.text = element_text(size = 20, hjust = 0)  
+  ) +
+  scale_fill_manual(values = c("Low" = "#99cbeb", "High" = "#547ac0")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26, hjust = 0)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1),  
+      symbols = c("*", "")       
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+
+plot(Box_Richness)
+
+#ggsave("Box_Richness15.pdf", plot = Box_Richness, device = "pdf", width = 14, height =7)
+
+
+results <- data %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(Richness[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(Richness[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(Richness[Eutrophic_Group == "Low"]) > 0 & length(Richness[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        Richness[Eutrophic_Group == "Low"],
+        Richness[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+
+
+```
+
+# Box plot FRic 15/85
+```{r}
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(FRic))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+Box_FRic <-
+  ggplot(data_filtered, aes(x = Dataset, y = FRic, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "FRic") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid = element_blank(),   
+    strip.text = element_text(size = 20)  
+  ) +
+  scale_fill_manual(values = c("Low" = "#fce4d4", "High" = "#ffc48a")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1), 
+      symbols = c("*", "")      
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+plot(Box_FRic)
+
+#ggsave("Box_FRic15.pdf", plot = Box_FRic, device = "pdf", width = 14, height =7)
+
+
+results <- data_filtered %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(FRic[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(FRic[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = tryCatch({
+      low_vals <- FRic[Eutrophic_Group == "Low"]
+      high_vals <- FRic[Eutrophic_Group == "High"]
+      if (sum(!is.na(low_vals)) > 1 & sum(!is.na(high_vals)) > 1) {
+        wilcox.test(low_vals, high_vals)$p.value
+      } else {
+        NA_real_
+      }
+    }, error = function(e) NA_real_)
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+```
+
+# Box plot Shannon 15/85
+```{r}
+
+data=read.csv("All_data.csv")
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.85) ~ "High",
+      TP <= quantile(TP, 0.15) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(Shannon))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+data_filtered <- data %>%
+  filter(!Dataset == "PP06")
+
+
+Box_Shannon <-
+  ggplot(data_filtered, aes(x = Dataset, y = Shannon, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "Shannon") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid = element_blank(),    
+    strip.text = element_text(size = 20)  
+  ) +
+  scale_fill_manual(values = c("Low" = "#99cbeb", "High" = "#547ac0")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1), 
+      symbols = c("*", "")      
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+plot(Box_Shannon)
+
+#ggsave("Box_Shannon15.pdf", plot = Box_Shannon, device = "pdf", width = 14, height =7)
+
+
+results <- data_filtered %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(Shannon[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(Shannon[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(Shannon[Eutrophic_Group == "Low"]) > 0 & length(Shannon[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        Shannon[Eutrophic_Group == "Low"],
+        Shannon[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+```
+
+# Box plot FDis 15/85
+```{r}
+
+data=read.csv("All_data.csv")
+data <- data %>%
+  group_by(Dataset) %>%
+  mutate(
+    Eutrophic_Group = case_when(
+      TP >= quantile(TP, 0.85) ~ "High",
+      TP <= quantile(TP, 0.15) ~ "Low",
+      TRUE ~ "Medium"
+    )
+  ) %>%
+  filter(Eutrophic_Group != "Medium")
+
+
+
+data$Eutrophic_Group <- factor(data$Eutrophic_Group, levels = c("Low", "High"))
+
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+
+
+datasets_to_remove <- data %>%
+  group_by(Dataset) %>%
+  summarise(all_na = all(is.na(FDis))) %>%
+  filter(all_na) %>%
+  pull(Dataset)
+
+data_filtered <- data %>%
+  filter(!Dataset %in% datasets_to_remove)
+
+data_filtered <- data %>%
+  filter(!Dataset == "PP06") # only richness
+
+data_filtered <- data_filtered %>%
+  filter(!is.na(FDis), is.finite(FDis))
+
+Box_FDis <-
+  ggplot(data_filtered, aes(x = Dataset, y = FDis, fill = Eutrophic_Group)) +
+  geom_boxplot(color = "black") +  
+  labs(x = "", y = "FDis") +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid = element_blank(),   
+    strip.text = element_text(size = 20)  
+  ) +
+  scale_fill_manual(values = c("Low" = "#fce4d4", "High" = "#ffc48a")) + 
+  theme(
+    legend.position = "none",
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 16),
+    strip.text = element_text(size = 26)  
+  ) +
+  stat_compare_means(
+    aes(group = Eutrophic_Group),
+    method = "wilcox.test", 
+    label = "p.signif", 
+    size = 6,
+    vjust = 1.5,
+    symnum.args = list(
+      cutpoints = c(0, 0.05, 1), 
+      symbols = c("*", "")       
+    )
+  ) +
+  facet_wrap(~Organism, scales = "free", ncol = 3, nrow = 2)
+
+plot(Box_FDis)
+
+#ggsave("Box_FDis15.pdf", plot = Box_FDis, device = "pdf", width = 14, height =7)
+
+
+results <- data_filtered %>%
+  group_by(Dataset) %>%
+  summarise(
+    Median_Low = median(FDis[Eutrophic_Group == "Low"], na.rm = TRUE),
+    Median_High = median(FDis[Eutrophic_Group == "High"], na.rm = TRUE),
+    P_Value = ifelse(
+      length(FDis[Eutrophic_Group == "Low"]) > 0 & length(FDis[Eutrophic_Group == "High"]) > 0,
+      wilcox.test(
+        FDis[Eutrophic_Group == "Low"],
+        FDis[Eutrophic_Group == "High"]
+      )$p.value,
+      NA
+    )
+  ) %>%
+  mutate(
+    Difference = case_when(
+      Median_High > Median_Low ~ "Higher",
+      Median_High < Median_Low ~ "Lower",
+      TRUE ~ "Equal"
+    ),
+    Significance = case_when(
+      P_Value < 0.05 ~ "Significant",
+      TRUE ~ "Not Significant"
+    )
+  )
+
+
+
+
+```

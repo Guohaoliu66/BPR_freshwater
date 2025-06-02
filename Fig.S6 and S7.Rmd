@@ -1,0 +1,324 @@
+
+# Scatter plot Richness
+```{r}
+data=read.csv("All_data.csv")
+library(ggplot2)
+
+data$Relationship_Type <- gsub("Inverted Unimodal", "U-shape", data$Relationship_Type)
+data$Dataset <- as.factor(data$Dataset)
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+Sca_Richness =
+  ggplot(data, aes(x = logTP, y = Richness, linetype = Data, color = Relationship_Type)) + 
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Positive Linear", "Negative Linear")),
+    aes(group = Dataset), 
+    method = "lm", 
+    formula = y ~ x, 
+    fill = "#a3d393", alpha = 0.3
+  ) +
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Unimodal", "U-shape")),
+    aes(group = Dataset), 
+    method = "lm", 
+    formula = y ~ poly(x, 2), 
+    fill = "#fdc58f", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c( "Non-significant")),
+    aes(group = Dataset), 
+    method = "lm", 
+    formula = y ~ poly(x, 2), 
+    fill = "white", alpha = 0.3,
+     se = FALSE 
+  ) +
+  labs(x = "Productivity (Total Phosphorus)",
+       y = "Richness") +
+  theme_minimal() +  
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),  
+    legend.key.size = unit(0.7, "cm"), 
+    legend.text = element_text(size = 10), 
+    legend.title = element_text(size = 14), 
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16), 
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+    strip.text = element_text(size = 14)  
+  ) +
+  facet_wrap(~ Organism) + 
+  guides(color = guide_legend(title = "Shape"), linetype = guide_legend(title = "Waterbody Type")) +  
+  scale_x_continuous( expand = c(0, 0.5)) +
+  scale_y_continuous(limits = c(0, 70), expand = c(0, 0)) +
+  scale_color_manual(
+    values = c(
+      "U-shape" = "#f8984e", 
+      "Negative Linear" = "skyblue",
+      "Non-significant" = "gray",
+      "Positive Linear" = "#0074b3",
+      "Unimodal" = "#db6968"
+    )
+  )
+
+plot(Sca_Richness)
+
+#ggsave("Sca_Richness.pdf", plot = Sca_Richness, device = "pdf", width = 10, height = 6)
+
+```
+
+# Scatter plot FRic
+```{r}
+
+data=read.csv("All_data_FRic.csv")
+data$Relationship_Type <- gsub("Inverted Unimodal", "U-shape", data$Relationship_Type)
+library(ggplot2)
+
+data$Dataset <- as.factor(data$Dataset)
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+Sca_FRic =
+  ggplot(data, aes(x = logTP, y = FRic, linetype = Data, color = Relationship_Type)) + 
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Positive Linear", "Negative Linear")),
+    aes(group = Dataset), 
+    method = "lm", 
+    formula = y ~ x, 
+    fill = "#a3d393", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Unimodal", "U-shape")),
+    aes(group = Dataset), 
+    method = "lm",
+    formula = y ~ poly(x, 2), 
+    fill = "#fdc58f", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c( "Non-significant")),
+    aes(group = Dataset), 
+    method = "lm",
+    formula = y ~ poly(x, 2), 
+    fill = "white", alpha = 0.3,
+     se = FALSE 
+  ) +
+  labs(x = "Productivity (Total Phosphorus)",
+       y = "FRic") +
+  theme_minimal() + 
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1), 
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(), 
+    legend.key.size = unit(0.7, "cm"),  
+    legend.text = element_text(size = 10),  
+    legend.title = element_text(size = 14),  
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16), 
+    axis.text.x = element_text(size = 14), 
+    axis.text.y = element_text(size = 14),   
+    strip.text = element_text(size = 14)  
+  ) +
+  facet_wrap(~ Organism) + 
+  guides(color = guide_legend(title = "Shape"), linetype = guide_legend(title = "Waterbody Type")) +  
+  scale_x_continuous( expand = c(0, 0.5)) +
+  scale_y_continuous(limits = c(0, 70), expand = c(0, 0)) + 
+  scale_color_manual(
+    values = c(
+      "U-shape" = "#f8984e",  
+      "Negative Linear" = "skyblue",
+      "Non-significant" = "gray",
+      "Positive Linear" = "#0074b3",
+      "Unimodal" = "#db6968"
+    )
+  )
+
+plot(Sca_FRic)
+
+#ggsave("Sca_FRic.pdf", plot = Sca_FRic, device = "pdf", width = 10, height = 6)
+```
+
+
+# Scatter plot Shannon
+```{r}
+data=read.csv("All_data_Shannon.csv")
+library(ggplot2)
+
+data <- data %>%
+  filter(!Dataset %in% c("PP06", "AP06", "AP05","AP07", "AP08"))
+
+data$Dataset <- as.factor(data$Dataset)
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+Sca_Shannon =
+  ggplot(data, aes(x = logTP, y = Shannon, linetype = Data, color = Relationship_Type)) + 
+
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Positive Linear", "Negative Linear")),
+    aes(group = Dataset), 
+    method = "lm",  
+    formula = y ~ x, 
+    fill = "#a3d393", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Unimodal", "Inverted Unimodal")),
+    aes(group = Dataset), 
+    method = "lm", 
+    formula = y ~ poly(x, 2), 
+    fill = "#fdc58f", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c( "Non-significant")),
+    aes(group = Dataset), 
+    method = "lm", 
+    formula = y ~ poly(x, 2), 
+    fill = "white", alpha = 0.3,
+     se = FALSE 
+  ) +
+  labs(x = "Productivity (Total Phosphorus)",
+       y = "Shannon") +
+  theme_minimal() +  
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(),  
+    legend.key.size = unit(0.7, "cm"),  
+    legend.text = element_text(size = 10), 
+    legend.title = element_text(size = 14), 
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16),
+    axis.text.x = element_text(size = 14),  
+    axis.text.y = element_text(size = 14),   
+    strip.text = element_text(size = 14)    
+  ) +
+  facet_wrap(~ Organism) +  
+  guides(color = guide_legend(title = "Type"), linetype = guide_legend(title = "Waterbody Type")) +  
+  scale_x_continuous( expand = c(0, 0.5)) +
+  scale_y_continuous(limits = c(0, 4.5), expand = c(0, 0)) +  
+  scale_color_manual(
+    values = c(
+      "Inverted Unimodal" = "#f8984e",  
+      "Negative Linear" = "skyblue",
+      "Non-significant" = "gray",
+      "Positive Linear" = "#0074b3",
+      "Unimodal" = "#db6968"
+    )
+  )
+
+plot(Sca_Shannon)
+
+#ggsave("Sca_Shannon.pdf", plot = Sca_Shannon, device = "pdf", width = 10, height = 6)
+
+
+```
+
+# Scatter plot FDis
+```{r}
+data=read.csv("All_data_FDis.csv")
+library(ggplot2)
+
+data <- data %>%
+  filter(!Dataset == "PP06")
+
+data$Dataset <- as.factor(data$Dataset)
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+data <- data %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+custom_order <- c("Phytoplankton", "Benthic Diatoms", "Aquatic Plants", "Zooplankton", "Benthic Macroinvertebrates", "Fish")
+data$Organism <- factor(data$Organism, levels = custom_order)
+
+Sca_FDis =
+  ggplot(data, aes(x = logTP, y = FDis, linetype = Data, color = Relationship_Type)) + 
+
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Positive Linear", "Negative Linear")),
+    aes(group = Dataset), 
+    method = "lm",  
+    formula = y ~ x, 
+    fill = "#a3d393", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c("Unimodal", "Inverted Unimodal")),
+    aes(group = Dataset), 
+    method = "lm",  
+    formula = y ~ poly(x, 2), 
+    fill = "#fdc58f", alpha = 0.3
+  ) +
+  
+  geom_smooth(
+    data = subset(data, Relationship_Type %in% c( "Non-significant")),
+    aes(group = Dataset), 
+    method = "lm",  
+    formula = y ~ poly(x, 2), 
+    fill = "white", alpha = 0.3,
+     se = FALSE 
+  ) +
+  labs(x = "Productivity (Total Phosphorus)",
+       y = "FDis") +
+  theme_minimal() + 
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(),  
+    legend.key.size = unit(0.7, "cm"),  
+    legend.text = element_text(size = 10),  
+    legend.title = element_text(size = 14), 
+    axis.title.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16), 
+    axis.text.x = element_text(size = 14),  
+    axis.text.y = element_text(size = 14),   
+    strip.text = element_text(size = 14)    
+  ) +
+  facet_wrap(~ Organism) +
+  guides(color = guide_legend(title = "Shape"), linetype = guide_legend(title = "Waterbody Type")) + 
+  scale_x_continuous( expand = c(0, 0.5)) +
+  scale_y_continuous(limits = c(0, 8), expand = c(0, 0)) + 
+  scale_color_manual(
+    values = c(
+      "Inverted Unimodal" = "#f8984e", 
+      "Negative Linear" = "skyblue",
+      "Non-significant" = "gray",
+      "Positive Linear" = "#0074b3",
+      "Unimodal" = "#db6968"
+    )
+  )
+
+plot(Sca_FDis)
+
+#ggsave("Sca_FDis.pdf", plot = Sca_FDis, device = "pdf", width = 10, height = 6)
+
+
+```

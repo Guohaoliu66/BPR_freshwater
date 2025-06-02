@@ -1,0 +1,192 @@
+
+# Site (Fig.S1)
+```{r}
+library(tidyverse)
+library(sf)
+library(jsonlite)
+
+dat=read.csv("Coord.csv")
+
+dat <- dat %>%
+  mutate(Organism = ifelse(Organism == "Benthic Diatom", "Benthic Diatoms", Organism))
+dat <- dat %>%
+  mutate(Organism = ifelse(Organism == "Aquatic Plant", "Aquatic Plants", Organism))
+dat <- dat %>%
+  mutate(Organism = ifelse(Organism == "Benthic Macroinvertebrate", "Benthic Macroinvertebrates", Organism))
+
+dat_rob <- dat %>%
+  filter(!is.na(X), !is.na(Y)) %>%
+  sf::st_as_sf(coords = c("X", "Y"), crs = 4326) %>%  
+  sf::st_transform(crs = sf::st_crs("+proj=robin +lon_0=0 +datum=WGS84 +units=m +no_defs")) %>%
+  slice_sample(prop = 1)
+
+sf::sf_use_s2(FALSE)
+
+world_map <- sf::read_sf("D:/Desktop/Data/R/output/shp/TM_WORLD_BORDERS_SIMPL-0.3.shp") %>%
+  sf::st_cast("POLYGON") %>%
+  mutate(area = sf::st_area(geometry)) %>%
+  filter(as.numeric(area) > 10^9) %>%
+  sf::st_buffer(0) %>%
+  sf::st_crop(sf::st_bbox(c(xmin = -180, xmax = 180, ymin = -90, ymax = 90))) %>%
+  sf::st_transform(crs = sf::st_crs("+proj=robin +lon_0=0 +datum=WGS84 +units=m +no_defs"))
+
+
+dat_rob$Organism <- factor(dat_rob$Organism, levels = c(
+  "Aquatic Plants",
+  "Fish",
+  "Benthic Diatoms",
+  "Phytoplankton",
+  "Benthic Macroinvertebrates",
+  "Zooplankton"
+))
+
+ggplot() + geom_sf(data = world_map)
+
+ggplot() +
+  geom_sf(data = world_map, fill = "grey90", color = "grey80") +
+  geom_sf(data = dat_rob, aes(color = Organism), shape = 17, size = 1.2, alpha = 0.4) +
+  scale_color_manual(values = c(
+  "Aquatic Plants" = "#d8d4f2",
+  "Fish" = "#4a68c4",
+  "Benthic Diatoms" = "#b0aee0",
+  "Phytoplankton" = "#1d4db3",
+  "Benthic Macroinvertebrates" = "#7e8ccf",
+  "Zooplankton" = "#002f8c"
+  )) +
+  scale_x_continuous(breaks = seq(-180, 180, 45)) +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.title = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    plot.margin = margin(0, 0, 0, 0)
+  )
+
+
+#ggsave("site_map.pdf", width = 5, height = 3, dpi = 300)
+
+```
+
+# Cor plot (Fig.S2)
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+
+data <- data %>%
+  filter(!(Dataset %in% c("AP05","AP06","AP07","AP08")))
+
+index_vars <- c("Richness", "Shannon", "FRic", "FDis")
+
+var_pairs <- t(combn(index_vars, 2)) %>% as.data.frame()
+colnames(var_pairs) <- c("Var1", "Var2")
+
+get_cor_results <- function(df, dataset_name) {
+  results <- map2_dfr(var_pairs$Var1, var_pairs$Var2, function(x, y) {
+    x_vals <- df[[x]]
+    y_vals <- df[[y]]
+    if (sum(!is.na(x_vals) & !is.na(y_vals)) >= 3) {  
+      test <- cor.test(x_vals, y_vals, method = "pearson")
+      tibble(
+        Dataset = dataset_name,
+        Var1 = x,
+        Var2 = y,
+        R_value = round(test$estimate, 3),
+        P_value = round(test$p.value, 4)
+      )
+    } else {
+      tibble(
+        Dataset = dataset_name,
+        Var1 = x,
+        Var2 = y,
+        R_value = NA_real_,
+        P_value = NA_real_
+      )
+    }
+  })
+  return(results)
+}
+
+cor_results_all <- data %>%
+  group_by(Dataset) %>%
+  group_split() %>%
+  map_dfr(~ get_cor_results(.x, unique(.x$Dataset)))
+
+cor_results_all <- cor_results_all %>%
+  mutate(label = case_when(
+    is.na(P_value) ~ "",
+    P_value <= 0.001 ~ "***",
+    between(P_value, 0.001, 0.01) ~ "**",
+    between(P_value, 0.01, 0.05) ~ "*",
+    TRUE ~ ""
+  ))
+
+cor_results_all <- cor_results_all %>%
+  mutate(
+    Var1 = case_when(
+      Var1 == "Richness" ~ "Rich",
+      Var1 == "Shannon" ~ "H'",
+      TRUE ~ Var1
+    ),
+    Var2 = case_when(
+      Var2 == "Richness" ~ "Rich",
+      Var2 == "Shannon" ~ "H'",
+      TRUE ~ Var2
+    ),
+    Index_Pair = paste(Var1, Var2, sep = " ~ ")
+  )
+cor_results_all <- cor_results_all %>%
+  mutate(Index_Pair = paste(Var1, Var2, sep = " ~ "))
+
+cor_results_all <- cor_results_all %>%
+  mutate(
+    Index_Pair = paste(Var1, Var2, sep = " ~ "),
+    label = case_when(
+      is.na(P_value) ~ "",
+      P_value <= 0.001 ~ "*\n*\n*",   
+      P_value <= 0.01 ~ "*\n*",      
+      P_value <= 0.05 ~ "*",        
+      TRUE ~ ""
+    )
+  )
+
+ggplot(cor_results_all, aes(x = Dataset, y = Index_Pair)) + 
+  geom_tile(aes(fill = R_value), colour = "grey", size = 0.5) +
+  scale_fill_gradient2(
+    low = "#5C5DAF", mid = "white", high = "#ffc48a",
+    limits = c(-1, 1), name = "Correlation (R)"
+  ) +
+  geom_text(
+    aes(label = label),
+    color = "black",
+    size = 5,
+    lineheight = 0.4    
+  ) + 
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.8, size = 7),
+    axis.text.y = element_text(size = 12),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  )  +
+  scale_x_discrete(position = "bottom")+
+  labs(fill = paste0("***  p < 0.001\n",
+                     "**   p < 0.01\n",
+                     "*    p < 0.05\n\n",
+                     "Correlation (R)"))
+
+#ggsave("Cor.pdf",  width = 11, height = 5)
+
+r_value_range <- cor_results_all %>%
+  group_by(Var1, Var2) %>%
+  summarise(
+    R_min = min(R_value, na.rm = TRUE),
+    R_max = max(R_value, na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
