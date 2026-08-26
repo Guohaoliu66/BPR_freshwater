@@ -25,4 +25,4 @@ The scripts in `000_scripts/` reproduce the analyses, figures, and tables presen
 
 ## Citation
 
-The associated manuscript is currently submitted. Citation and DOI details are pending.
+The associated manuscript is currently under review in Communications earth and environment. Citation and DOI details are pending.
